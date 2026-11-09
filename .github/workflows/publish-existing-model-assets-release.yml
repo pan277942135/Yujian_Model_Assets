@@ -1,0 +1,69 @@
+name: Publish Existing Model Assets Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/publish-existing-model-assets-release.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  publish-existing-draft:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify immutable assets and publish existing Draft Release in place
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="pan277942135/Yujian_Model_Assets"
+          release_id="422778098"
+
+          before="$(gh api "repos/${repo}/releases/${release_id}")"
+          jq -e '
+            .draft == true and
+            .tag_name == "model-assets-v1" and
+            .name == "YuJian Model Assets v1" and
+            (.assets | length == 2) and
+            any(.assets[];
+              .id == 672467369 and
+              .name == "det-fish-v03.zip" and
+              .size == 10525017 and
+              .digest == "sha256:4a3dd5a55f254e6a813d7f029e23b8fe00caf7c616422be51510b70a3ba495ca"
+            ) and
+            any(.assets[];
+              .id == 672468391 and
+              .name == "classifier-crop-m1-v02.zip" and
+              .size == 19082024 and
+              .digest == "sha256:aef10982824426052c07907093b11cb1d6448ff5f6c52027f266ed95f87c640a"
+            )
+          ' <<< "$before" >/dev/null
+
+          gh api --method PATCH "repos/${repo}/releases/${release_id}" -F draft=false >/dev/null
+
+          after="$(gh api "repos/${repo}/releases/${release_id}")"
+          jq -e '
+            .draft == false and
+            .tag_name == "model-assets-v1" and
+            (.assets | length == 2) and
+            any(.assets[];
+              .id == 672467369 and
+              .name == "det-fish-v03.zip" and
+              .size == 10525017 and
+              .digest == "sha256:4a3dd5a55f254e6a813d7f029e23b8fe00caf7c616422be51510b70a3ba495ca"
+            ) and
+            any(.assets[];
+              .id == 672468391 and
+              .name == "classifier-crop-m1-v02.zip" and
+              .size == 19082024 and
+              .digest == "sha256:aef10982824426052c07907093b11cb1d6448ff5f6c52027f266ed95f87c640a"
+            )
+          ' <<< "$after" >/dev/null
+
+          echo "Published existing Release without re-upload:"
+          jq -r '.html_url' <<< "$after"
